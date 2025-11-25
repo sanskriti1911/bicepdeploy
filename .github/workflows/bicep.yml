@@ -46,8 +46,8 @@ jobs:
         run: |
           az deployment group what-if \
             --resource-group "Sanskriti_Mahendra_RG" \
-            --main.bicep \
-            --parameters infra/main.parameters.json
+            --template-file main.bicep \
+            --parameters main.parameters.json
 
   deploy:
     name: Deploy to Azure
@@ -76,8 +76,8 @@ jobs:
         run: |
           az deployment group create \
             --resource-group "Sanskriti-Sanskriti_Mahendra_RG" \
-            --main.bicep \
-            --main.parameters.json \
+            --template-file main.bicep \
+            --parameters main.parameters.json \
             --mode Incremental \
             --output json > deployment-output.json
           echo "Deployment outputs:" && cat deployment-output.json
