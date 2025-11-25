@@ -40,13 +40,13 @@ jobs:
       - name: Bicep Build (syntax check)
         run: |
           az bicep version
-          az bicep build --file infra/main.bicep --outfile /tmp/main.json
+          az bicep build --file main.bicep --outfile main.json
 
       - name: What-If (preview changes)
         run: |
           az deployment group what-if \
             --resource-group "Sanskriti_Mahendra_RG" \
-            --template-file infra/main.bicep \
+            --main.bicep \
             --parameters infra/main.parameters.json
 
   deploy:
@@ -76,8 +76,8 @@ jobs:
         run: |
           az deployment group create \
             --resource-group "Sanskriti-Sanskriti_Mahendra_RG" \
-            --template-file infra/main.bicep \
-            --parameters infra/main.parameters.json \
+            --main.bicep \
+            --main.parameters.json \
             --mode Incremental \
             --output json > deployment-output.json
           echo "Deployment outputs:" && cat deployment-output.json
