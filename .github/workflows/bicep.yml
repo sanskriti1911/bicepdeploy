@@ -1,88 +1,74 @@
-
-name: Azure Bicep Deployment
-run-name: "Bicep Deploy - ${{ github.ref_name }}"
-
+name: "Bicep Azure CI/CD"
+run-name: "Bicep • ${{ github.actor }} • run #${{ github.run_number }}"
+ 
 on:
   workflow_dispatch:
-    inputs:
-      subscriptionId:
-        description: 'Azure Subscription ID (optional, overrides secret subscription)'
-        required: false
-        default: '679f3d56-bed2-429f-9e31-4d7bf67e14c7'
   push:
-    branches: [ master ]
-
-permissions:
-  contents: read
-
+    branches: [ master ]  
+    paths:
+      - "bicep/**"
+      - ".github/workflows/bicep.yml"
+  pull_request:
+    branches: [ master ]  
+    paths:
+      - "bicep/**"
+      - ".github/workflows/bicep.yml"
+ 
+env:
+  RG_NAME: Sanskriti_Mahendra_RG
+  LOCATION: centralindia
+  subscriptionid: '679f3d56-bed2-429f-9e31-4d7bf67e14c7'
+ 
 jobs:
-  validate:
-    name: Validate Bicep (build & what-if)
+  plan:
+    name: "Plan (What-If)"
     runs-on: ubuntu-latest
+ 
     steps:
-      - name: Checkout
+      - name: "Checkout"
         uses: actions/checkout@v4
-
-      - name: Azure Login (Service Principal)
+ 
+      - name: "Azure Login"
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Select Subscription (optional)
-        if: ${{ inputs.subscriptionId != '' }}
-        run: az account set --subscription "${{ inputs.subscriptionId }}"
-
-      - name: Using existing Resource Group
-        run: |
-          echo "Using existing resource group: Sanskriti_MahendraRG"
-          az group show --name "Sanskriti_Mahendra_RG" --output table
-
-      - name: Bicep Build (syntax check)
-        run: |
-          az bicep version
-          az bicep build --file main.bicep --outfile main.json
-
-      - name: What-If (preview changes)
+ 
+      - name: "Ensure Resource Group exists"
+        run: az group create -n $RG_NAME -l $LOCATION
+ 
+      - name: "Bicep compile check"
+        run: az bicep build --file main.bicep --outfile out.json
+ 
+      - name: "What-If"
         run: |
           az deployment group what-if \
-            --resource-group "Sanskriti_Mahendra_RG" \
+            --resource-group $RG_NAME \
             --template-file main.bicep \
-            --parameters main.parameters.json
-
-  deploy:
-    name: Deploy to Azure
+            --parameters main.parameters.json \
+            --result-format FullResourcePayloads
+ 
+  apply:
+    name: "Apply (Deploy)"
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [ plan ]                 # second job runs only if plan succeeds
+    if: github.ref == 'refs/heads/master'   # ✅ Only apply on master branch
+ 
     steps:
-      - name: Checkout
+      - name: "Checkout"
         uses: actions/checkout@v4
-
-      - name: Azure Login (Service Principal)
+ 
+      - name: "Azure Login"
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Select Subscription (optional)
-        if: ${{ inputs.subscriptionId != '' }}
-        run: az account set --subscription "${{ inputs.subscriptionId }}"
-
-      - name: Using existing Resource Group
-        run: |
-          echo "Using existing resource group: Sanskriti_Mahendra_RG"
-          az group show --name "Sanskriti_Mahendra_RG" --output table
-
-      - name: Deploy Bicep
-        id: deploy
+ 
+      - name: "Deploy"
         run: |
           az deployment group create \
-            --resource-group "Sanskriti-Sanskriti_Mahendra_RG" \
+            --resource-group $RG_NAME \
             --template-file main.bicep \
-            --parameters main.parameters.json \
-            --mode Incremental \
-            --output json > deployment-output.json
-          echo "Deployment outputs:" && cat deployment-output.json
-
-      - name: Print Web URL
+            --parameters main.parameters.json
+ 
+      - name: "Show outputs"
         run: |
-          WEB_URL=$(jq -r '.properties.outputs.webUrl.value' deployment-output.json)
-          echo "Web URL: $WEB_URL"
+          DEPLOY_NAME=$(az deployment group list -g $RG_NAME --query "[-1].name" -o tsv)
