@@ -5,10 +5,10 @@ on:
   workflow_dispatch:
     inputs:
       user_input:
-        description: "A string to start the chain (e.g., 'Janvi')"
+        description: "A string to start the chain (e.g., 'Sanskriti')"
         type: string
         required: true
-        default: "Janvi"
+        default: "Sanskriti"
       multiplier:
         description: "An integer multiplier used by Job 2"
         type: number
