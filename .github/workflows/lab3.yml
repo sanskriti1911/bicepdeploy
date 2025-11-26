@@ -1,0 +1,97 @@
+name: Three Jobs – Chained Outputs
+run-name: Run #${{ github.run_number }} – userInput=${{ inputs.user_input }} – multiplier=${{ inputs.multiplier }}
+ 
+on:
+  workflow_dispatch:
+    inputs:
+      user_input:
+        description: "A string to start the chain (e.g., 'Janvi')"
+        type: string
+        required: true
+        default: "Janvi"
+      multiplier:
+        description: "An integer multiplier used by Job 2"
+        type: number
+        required: true
+        default: 2
+ 
+jobs:
+  job1:
+    name: Job 1 – Produce output from input
+    runs-on: ubuntu-latest
+    outputs:
+      job1_message: ${{ steps.build_msg.outputs.job1_message }}
+      job1_length: ${{ steps.calc_len.outputs.job1_length }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+ 
+      - name: Build message from input
+        id: build_msg
+        shell: bash
+        run: |
+          # Compose a message using the workflow input
+          MSG="Hello, ${{ inputs.user_input }}!"
+          echo "job1_message=$MSG" >> "$GITHUB_OUTPUT"
+ 
+      - name: Calculate length of user_input
+        id: calc_len
+        shell: bash
+        run: |
+          LEN=${#${{ inputs.user_input }}}
+          echo "job1_length=$LEN" >> "$GITHUB_OUTPUT"
+ 
+      - name: Show Job 1 outputs
+        shell: bash
+        run: |
+          echo "Job1 Message: ${{ steps.build_msg.outputs.job1_message }}"
+          echo "Job1 Length : ${{ steps.calc_len.outputs.job1_length }}"
+ 
+  job2:
+    name: Job 2 – Use Job 1 output and produce new output
+    runs-on: ubuntu-latest
+    needs: job1
+    outputs:
+      job2_result: ${{ steps.process.outputs.job2_result }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+ 
+      - name: Process Job1 outputs with multiplier
+        id: process
+        shell: bash
+        run: |
+          # Read outputs from job1
+          MSG="${{ needs.job1.outputs.job1_message }}"
+          LEN="${{ needs.job1.outputs.job1_length }}"
+          MULT="${{ inputs.multiplier }}"
+ 
+          # Example processing:
+          # 1) Append info to the message.
+          # 2) Multiply the length by the input multiplier.
+          NEW_MSG="$MSG (length=${LEN}, multiplier=${MULT})"
+          MULT_LEN=$(( LEN * MULT ))
+ 
+          # Create a combined result string
+          RESULT="$NEW_MSG => multiplied_length=$MULT_LEN"
+ 
+          echo "job2_result=$RESULT" >> "$GITHUB_OUTPUT"
+ 
+      - name: Show Job 2 output
+        shell: bash
+        run: |
+          echo "Job2 Result: ${{ steps.process.outputs.job2_result }}"
+ 
+  job3:
+    name: Job 3 – Consume Job 2 output
+    runs-on: ubuntu-latest
+    needs: [job1, job2]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+ 
+      - name: Final step using Job2 output (and Job1 for reference)
+        shell: bash
+        run: |
+          echo "From Job2: ${{ needs.job2.outputs.job2_result }}"
+          echo "Reference Job1 Message: ${{ needs.job1.outputs.job1_message }}"
